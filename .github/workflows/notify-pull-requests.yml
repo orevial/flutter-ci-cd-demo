@@ -1,0 +1,106 @@
+name: 🔔 PR Notifier
+
+on:
+  pull_request:
+    types:
+      - closed
+      - review_requested
+    branches:
+      - 'main'
+  pull_request_review:
+    types:
+      - submitted
+    branches:
+      - 'main'
+
+jobs:
+  notifyPREvent:
+    name: 🔔 Notify Discord of a new Pull Request event
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔔🧑‍💻 Send a notification to known reviewer when a PR review is requested
+        if: github.event_name == 'pull_request' && github.event.action == 'review_requested' && contains(fromJSON(vars.IDS_GITHUB_TO_DISCORD).*.github_id, github.event.requested_reviewer.login)
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_BUILD_WEBHOOK_URL }}
+          avatar_url: ${{ secrets.DISCORD_BUILD_WEBHOOK_AVATAR }}
+          username: |
+            Pull Request notifier
+          color: 0x12AFFA
+          content: |
+            👋 Hey <@${{ fromJSON(vars.IDS_GITHUB_TO_DISCORD)[github.event.requested_reviewer.login].discord_id }}>, you've been asked to review a PR 🤓
+          description: |
+            Go and [check it now](${{ github.event.pull_request.self }}) !
+          title: |
+            Pull Request: ${{ github.event.pull_request.title }}
+          url: ${{ github.event.pull_request.self }}
+          noprefix: true
+      - name: 🔔❓ Send a notification to unknown reviewer when a PR review is requested
+        if: github.event_name == 'pull_request' && github.event.action == 'review_requested' && !contains(fromJSON(vars.IDS_GITHUB_TO_DISCORD).*.github_id, github.event.requested_reviewer.login)
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_BUILD_WEBHOOK_URL }}
+          avatar_url: ${{ secrets.DISCORD_BUILD_WEBHOOK_AVATAR }}
+          username: |
+            Pull Request notifier
+          color: 0x12AFFA
+          content: |
+            👋 Hey ${{ github.event.requested_reviewer.login }}, you've been asked to review a PR 🤓
+          description: |
+            Go and [check it now](${{ github.event.pull_request.self }}) !
+            ⚠️ Important: ${{ github.event.requested_reviewer.login }}, your Discord id is not referenced in [Github Actions mappings (`IDS_GITHUB_TO_DISCORD` variable)](https://github.com/orevial/flutter-ci-cd-demo/settings/variables/actions), please add it !
+          title: |
+            Pull Request: ${{ github.event.pull_request.title }}
+          url: ${{ github.event.pull_request.self }}
+          noprefix: true
+      - name: 🔔🧑‍💻 Send a notification to know PR author when a new review is submitted
+        if: github.event_name == 'pull_request_review' && github.event.action == 'submitted' && contains(fromJSON(vars.IDS_GITHUB_TO_DISCORD).*.github_id, github.event.pull_request.user.login)
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_BUILD_WEBHOOK_URL }}
+          avatar_url: ${{ secrets.DISCORD_BUILD_WEBHOOK_AVATAR }}
+          username: |
+            Pull Request notifier
+          color: 0x1B385E
+          content: |
+            👋 Hey <@${{ fromJSON(vars.IDS_GITHUB_TO_DISCORD)[github.event.pull_request.user.login].discord_id }}>, there's a new review available for your PR 💬
+          description: |
+            Go and [check it now](${{ github.event.pull_request.self }}) !
+          title: |
+            Pull Request: ${{ github.event.pull_request.title }}
+          url: ${{ github.event.pull_request.self }}
+          noprefix: true
+      - name: 🔔❓ Send a notification to unknown PR author when a new review is submitted
+        if: github.event_name == 'pull_request_review' && github.event.action == 'submitted' && !contains(fromJSON(vars.IDS_GITHUB_TO_DISCORD).*.github_id, github.event.pull_request.user.login)
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_BUILD_WEBHOOK_URL }}
+          avatar_url: ${{ secrets.DISCORD_BUILD_WEBHOOK_AVATAR }}
+          username: |
+            Pull Request notifier
+          color: 0x1B385E
+          content: |
+            Go and [check it now](${{ github.event.pull_request.self }}) !
+            👋 Hey ${{ github.event.pull_request.user.login }}, there's a new review available for your PR 💬
+          description: |
+            ⚠️ Important: ${{ github.event.pull_request.user.login }}, your Discord id is not referenced in [Github Actions mappings (`IDS_GITHUB_TO_DISCORD` variable)](https://github.com/orevial/flutter-ci-cd-demo/settings/variables/actions), please add it !
+          title: |
+            Pull Request: ${{ github.event.pull_request.title }}
+          url: ${{ github.event.pull_request.self }}
+          noprefix: true
+      - name: 🔔🔀 Send a notification when a PR is merged
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_BUILD_WEBHOOK_URL }}
+          avatar_url: ${{ secrets.DISCORD_BUILD_WEBHOOK_AVATAR }}
+          username: |
+            Pull Request notifier
+          color: 0x00C02C
+          title: |
+            🔀✅ PR merged: ${{ github.event.pull_request.title }} merged !
+          description: |
+            Good job, a [pull request](${{ github.event.pull_request.self }}) has been merged !
+            Time to start UAT release 📦🚀
+          url: ${{ github.event.pull_request.self }}
+          noprefix: true

@@ -1,0 +1,94 @@
+name: 🔨🧪 Build & Test
+
+permissions: write-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    branches:
+      - 'main'
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+      - '.git/'
+      - '.vscode/'
+
+jobs:
+  testAndCoverage:
+    name: 🧪 Test
+    if: github.event.pull_request.draft == false
+    uses: ./.github/workflows/_test_with_coverage.yml
+    secrets: inherit
+
+  analyze:
+    name: Analyze
+    if: github.event.pull_request.draft == false
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+      - name: ⚙️ Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - name: ⚙️ Setup Melos
+        uses: bluefireteam/melos-action@v2
+      - name: ⚙️ Install dependencies for all packages
+        run: melos build:pub_get:all
+      - name: 📄 Move dummy pubspec.yaml to root
+        run: cp scripts/pubspec_template.yaml pubspec.yaml
+      - name: ⚠️ℹ️ Run Dart analysis for app package
+        uses: zgosalvez/github-actions-analyze-dart@v2.0.9
+        with:
+          working-directory: "${{github.workspace}}/app/"
+      - name: ⚠️ℹ️ Run Dart analysis for data package
+        uses: zgosalvez/github-actions-analyze-dart@v2.0.9
+        with:
+          working-directory: "${{github.workspace}}/design_system/"
+      - name: 📈 Check metrics
+        uses: dart-code-checker/dart-code-metrics-action@v3.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pull_request_comment: true
+          check_unused_files: true
+          folders: 'app, design_system'
+
+  build:
+    name: Build Android
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+      - name: ⚙️ Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - name: ⚙️ Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: "12.x"
+          cache: 'gradle'
+        id: java
+      - name: ⚙️ Setup Melos
+        uses: bluefireteam/melos-action@v2
+      - name: ⚙️ Install dependencies for all packages
+        run: melos build:pub_get:all
+      - name: 🤖🔨 Build Android app
+        run: |
+          pushd app/
+          flutter build appbundle --debug --flavor dev -t lib/main_dev.dart
+          popd

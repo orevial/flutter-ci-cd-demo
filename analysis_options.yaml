@@ -1,29 +1,1263 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
-#
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
+##################################################################################
+##                      Linter rules for all packages                           ##
+##                      -----------------------------                           ##
+## Note that there is no need to define another                                 ##
+## analysis-options.yaml in each package because they will                      ##
+## automatically go up the tree if not found in the package. See here:          ##
+## https://dart.dev/guides/language/analysis-options#the-analysis-options-file  ##
+##################################################################################
+include: package:very_good_analysis/analysis_options.3.0.1.yaml
 
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
-include: package:flutter_lints/flutter.yaml
+##
+# Lint rules to be used for apps without developer facing API. i.e. command line tools and Flutter applications
+##
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # treat missing required parameters as an error (not a hint)
+    missing_required_param: error
+    # treat missing returns as an error (not a hint)
+    missing_return: error
+    # Reassignment should be treated as warning (not a hint)
+    parameter_assignments: warning
+  plugins:
+    - dart_code_metrics
+
+  # Exclude auto-generated files from dart analysis
+  exclude:
+    - '**/lib/**.freezed.dart'
+    - '**/lib/**/di.config.dart'
+    - '**/lib/**.g.dart'
+    - '**/lib/**.gr.dart'
+    - '**/test/**.freezed.dart'
+    - '**/test/**.g.dart'
+    - '**/lib/i18n/**.i69n.dart'
+
+dart_code_metrics:
+  metrics:
+    cyclomatic-complexity: 20
+    halstead-volume: 150
+    lines-of-code: 100
+    source-lines-of-code: 75
+    maintainability-index: 50
+    maximum-nesting-level: 5
+    maximum-nesting: 5
+    number-of-methods: 10
+    number-of-parameters: 4
+    technical-debt:
+      threshold: 16
+      todo-cost: 4
+      ignore-cost: 8
+      ignore-for-file-cost: 16
+      as-dynamic-cost: 16
+      deprecated-annotations-cost: 2
+      file-nullsafety-migration-cost: 2
+      unit-type: "hours"
+  anti-patterns:
+    - long-method:
+        exclude:
+          - '**/test/**_test.dart'
+          # Although Bloc methods should be split to separate methods, it is okay to have a long
+          # constructors within blocs because this is where the on<> method are used
+          # !MONITOR!
+          # Maybe:
+          # - lib/bloc/**/*_bloc.dart
+    # While this is generally a good practice, sometimes it's just more convenient to pass
+    # a longer list of parameters. Plus Dart named parameters make it easier to understand what
+    # the parameters actually mean in the context of a method call
+    # - long-parameter-list
+  rules:
+    ########################################################################
+    ##             DART CODE METRICS PLUGIN: ENABLED RULES                ##
+    ##                                                                    ##
+    ## Rules below are all the rules from dart-code-metrics that we use.  ##
+    ########################################################################
+    - avoid-banned-imports:
+        entries:
+          # Deny Flutter imports from core, data and domain packages
+          - paths: [ "packages/core/.*.dart", "packages/data/.*.dart", "packages/domain/.*.dart" ]
+            deny: [ "package:flutter/.*.dart" ]
+            message: "Do not import Flutter Material Design library, we should not depend on it!"
+          # Deny data and presentation imports from domain package
+          - paths: [ "packages/domain/.*.dart" ]
+            deny: [ "package:data/.*.dart", "package:presentation/.*.dart" ]
+            message: "Domain package should not depend on data or presentation layers!"
+          # Deny data imports from presentation package
+          - paths: [ "packages/presentation/.*.dart" ]
+            deny: [ "package:data/.*.dart" ]
+            message: "Presentation package should not depend on data layer!"
+          # Absolutely no package should depend on app (except itself, of course)
+          - paths: [ "packages/core/.*.dart", "packages/data/.*.dart", "packages/domain/.*.dart", "packages/presentation/.*.dart" ]
+            deny: [ "package:app/.*.dart" ]
+            message: "Do not import app package, we should not depend on it!"
+          - paths: [ "packages/presentation/screens/home/*.dart" ]
+            deny: [ "package:flutter/widgets.dart" ]
+            message: "Test 1"
+          - paths: [ "packages/presentation/screens/home/.*.dart" ]
+            deny: [ "package:flutter/widgets.dart" ]
+            message: "Test 2"
+    # Newly added !MONITOR!
+    - avoid-cascade-after-if-null
+    - avoid-collection-methods-with-unrelated-types
+    - avoid-double-slash-imports
+    - avoid-duplicate-exports
+    - avoid-global-state
+    - avoid-missing-enum-constant-in-map
+    - avoid-nested-conditional-expressions:
+        acceptable-level: 1
+    # !MONITOR!
+    # Maybe: While this rule is interesting, it leads to only false-positives in our case because we use
+    # non-ascii symbols correctly : '€' only in european flavors, and others that don't relate
+    # to specific locales such as '≈', '∞'...
+    - avoid-non-ascii-symbols
+    # Newly added !MONITOR!
+    - avoid-redundant-async
+    # !MONITOR!
+    # Maybe: our custom exceptions thrown in catch blocks seem legit
+    #- avoid-throw-in-catch-block
+    # !MONITOR!
+    # Maybe: While this rule can be useful, there are too many scenari where having top level declarations
+    # make sense (e.g. shared alchemist/golden config, common mocks, shared widgets, etc)
+    - avoid-top-level-members-in-tests:
+        exclude:
+          - "**/test/mocks/**"
+    - avoid-unnecessary-conditionals
+    - avoid-unnecessary-type-assertions
+    - avoid-unnecessary-type-casts
+    - avoid-unrelated-type-assertions
+    - avoid-unused-parameters
+    - binary-expression-operand-order
+    - double-literal-format
+    # !MONITOR!
+    # This rule is pretty opinionated, which is okay if the starting team agrees on the
+    # order that this rule enforces
+    # Let's try the default ordering : https://dartcodemetrics.dev/docs/rules/common/member-ordering
+    - member-ordering
+    - missing-test-assertion:
+        include-assertions: [ 'verify', 'verifyNever' ]
+    - no-boolean-literal-compare
+    # !MONITOR!
+    # Maybe: Although sometimes useful (and helped remove a lot of useless code),
+    # empty blocks can also be okay to use in Flutter. Examples:
+    #    - empty state reload `setState(() {})`
+    #    - callbacks `() {}`
+    - no-empty-block:
+        exclude:
+          - "**/test/**"
+    - no-equal-then-else
+    # !MONITOR!
+    # Maybe: Although a lot of magic number could be avoided by using widgets or other stuff,
+    # this rule adds too much noise overall.
+    # We should still try and reduce a lot of magic numbers though.
+    # Maybe add:
+    #     exclude:
+    #       - "**/test/**"
+    - no-magic-number:
+        allowed: [ -1, 0, 1, 2 ]
+        exclude:
+          - "**/test/**"
+    - no-object-declaration
+    - prefer-commenting-analyzer-ignores
+    - prefer-correct-identifier-length:
+        exceptions:
+          # counters
+          - i
+          - j
+          # coordinates
+          - x
+          - y
+          # various
+          - id
+          - db
+          # Theme spacings
+          - xs
+          - xl
+          - s
+          - m
+          - sm
+          - l
+          - lm
+    - prefer-correct-test-file-name
+    - prefer-correct-type-name:
+        min-length: 3
+        max-length: 50
+    - prefer-enums-by-name
+    - prefer-first
+    - prefer-immediate-return
+    # Newly added !MONITOR!
+    - prefer-iterable-of
+    - prefer-last
+    # Newly added !MONITOR!
+    - prefer-static-class:
+        - ignore-private: true
+    - prefer-trailing-comma
+    # Flutter specific
+    - always-remove-listener
+    # Newly added !MONITOR!
+    - avoid-border-all
+    - avoid-expanded-as-spacer
+    # !MONITOR!
+    # Maybe: Although it is good practice to extract widget builders methods to custom widget
+    # (mostly from a performance point-of-view), we have way too many of them and sometimes
+    # functions are okay for very small portions of code
+    - avoid-returning-widgets:
+        exclude:
+          - '**/test/**_test.dart'
+    # Newly added !MONITOR!
+    - avoid-shrink-wrap-in-lists
+    - avoid-unnecessary-setstate
+    - avoid-wrapping-in-padding
+    # Newly added !MONITOR!
+    - check-for-equals-in-render-object-setters
+    # Newly added !MONITOR!
+    - consistent-update-render-object
+    # Newly added !MONITOR!
+    - prefer-const-border-radius
+    - prefer-correct-edge-insets-constructor
+    # !MONITOR!
+    # Maybe: Although it is good practice to try and separate widgets into different files, sometimes
+    # it's okay to put multiple simple widgets into the same file so this rule might be too restrictive.
+    # However, the rule might work as we can ignore private widgets from the rule, let's now monitor it...
+    - prefer-single-widget-per-file:
+        ignore-private-widgets: true
+    - prefer-using-list-view
+    # Newly added !MONITOR!
+    - use-setstate-synchronously
+
+    - avoid-passing-async-when-sync-expected:
+      exclude:
+        - '**/test/**'
+
+    ########################################################################
+    ##            DART CODE METRICS PLUGIN: DISABLED RULES                ##
+    ##                                                                    ##
+    ## Rules below are all the rules from dart-code-metrics               ##
+    ##  that we DO NOT use, and why.                                      ##
+    ########################################################################
+    # Doesn't seem very useful, named arguments are already named so who cares
+    # if they are passed in order...
+    # arguments-ordering
+
+    # Although mostly useful over the app, creates too much clutter when running DCM analyze action on CI,
+    # for some reason...
+    #- avoid-dynamic:
+    #    exclude:
+    #      - "**/test/**"
+
+    # It's sometimes justified to use non-null assertion operator, this rule is too generic to be really useful
+    # - avoid-non-null-assertion
+
+    # Not sure if that rule could be useful for us...
+    # - ban-name
+
+    # This rule seems would introduce some very opinionated views
+    # - format-comment
+
+    # We will be using freezed instead of equatable, this rule doesn't apply for us
+    # - list-all-equatable-fields
+
+    # Too many false positive with Flutter widget system
+    # - no-equal-arguments
+
+    # Mostly uninteresting
+    # - prefer-match-file-name
+
+    # Too many false positives : there are many cases where it's okay not to use
+    # the return value of a method call
+    # - avoid-ignoring-return-values:
+
+    # Although it is good practice to extract long callbacks to methods,
+    # this rule is too restritive. Sometimes a 2-3 lines inline callback is more readable than a function,
+    # and the function might be overkill
+    # - prefer-extracting-callbacks
+
+    # Coding style preference, too opinionated
+    # - newline-before-return
+
+    # Too opinionated, then is just fine and is sometimes more readable than async/await succession
+    # - prefer-async-await
+
+    # Too opinionated and often less readable than the good ol' if/else.
+    # Plus conflicts with package:lint default rule 'prefer_if_elements_to_conditional_expressions'
+    # - prefer-conditional-expressions
+
+    # Mostly uninteresting
+    # - tag-name
+
+    # late keyword is okay to use
+    # - avoid-late-keyword
+
+    # Annoying as hell when using context variables
+    # - prefer-moving-to-variable
 
 linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at
-  # https://dart-lang.github.io/linter/lints/index.html.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    ########################################################################
+    ##                            CUSTOM RULES                            ##
+    ##                       -----------------------                      ##
+    ##                                                                    ##
+    ## Those rules are either :                                           ##
+    ##  -  disabled in inherited package and enabled here (if true here)  ##
+    ##  -  enabled in inherited package and disabled here (if false here) ##
+    ########################################################################
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+    always_put_required_named_parameters_first: true
+
+    # Since nullsafety landed in dart, `int?` is completely fine to return null and `int` can't return `null` at all.
+    #
+    # In general there are plenty of valid reasons to return `null`, not a useful rule
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.31)
+    avoid_returning_null: true
+
+    # Nobody wants to manually wrap lines when changing a few words. This rule is too hard to be a "general" rule
+    lines_longer_than_80_chars: false
+
+    # Types for local variables can improve readability and shouldn't be forced to be removed.
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.30)
+    #
+    omit_local_variable_types: false
+
+    # Defining interfaces (abstract classes), with only one method, makes sense architecture wise
+    # Discussion: https://github.com/passsy/dart-lint/issues/2
+    #
+    #
+    one_member_abstracts: false
+
+    # Only relevant for packages, not applications or general dart code
+    package_api_docs: false
+
+    # Definitely not a rule for standard dart code. Maybe relevant for packages
+    public_member_api_docs: false
+
+    # There is no argument which makes int literals better than double literals for doubles.
+    #
+    prefer_int_literals: false
+
+    # "Any sorting is better than no sorting"... probably but it's also a lot of work
+    # for little added value on pub dependencies. Sometimes it's even less readable
+    # because logical groups can be made with packages that might now follow each other
+    # in the alphabetical order
+    sort_pub_dependencies: false
+
+    # Use whatever makes you happy. lint doesn't define a style
+    # Conflicts with prefer_double_quotes
+    #
+    prefer_single_quotes: false
+
+    # Working, results in consistent code. But too opinionated
+    # Discussion: https://github.com/passsy/dart-lint/issues/1
+    #
+    # Also, we rather want to use member-ordering rule from Dart Code Metrics
+    # (https://dartcodemetrics.dev/docs/rules/common/member-ordering) to
+    # have consistent code that match our opinionated way to do it
+    #
+    sort_constructors_first: false
+
+    ########################################################################
+    ##                           Dart 2.19 rules                          ##
+    ##                       -----------------------                      ##
+    ##                                                                    ##
+    ## We use the plugin "very_good_analysis" in version 3.1.0            ##
+    ## as our base rules set.                                             ##
+    ## However as of 2023/02/06 new Dart 2.19 rules have not been         ##
+    ## added to this plugin yet, so we will put them there for now.       ##
+    ########################################################################
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    collection_methods_unrelated_type: true
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    combinators_ordering: true
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    dangling_library_doc_comments: true
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    library_annotations: true
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    unnecessary_library_directive: true
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    implicit_call_tearoffs: true
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    unreachable_from_main: true
+
+    # !MONITOR!
+    # New Dart 2.19 rule (as of 2023/02/06)
+    use_string_in_part_of_directives: true
+
+    ########################################################################
+    ##                       INHERITED ENABLED RULES                      ##
+    ##                       -----------------------                      ##
+    ##                                                                    ##
+    ##   Rules below come from package                                    ##
+    ##      https://pub.dev/packages/very_good_analysis                   ##
+    ########################################################################
+    # Prevents accidental return type changes which results in a breaking API change.
+    # Enforcing return type makes API changes visible in a diff
+    #
+    #    - always_declare_return_types
+
+    # All non nullable named parameters should be and annotated with @required.
+    # This allows API consumers to get warnings via lint rather than a crash a runtime.
+    # Might become obsolete with Non-Nullable types
+    #
+    #   - always_require_non_null_named_parameters
+
+    # Protect against unintentionally overriding superclass members
+    #
+    #    - annotate_overrides
+
+    # Highlights boolean expressions which can be simplified
+    #    - avoid_bool_literals_in_conditional_expressions
+
+    # Errors aren't for catching but to prevent prior to runtime
+    #
+    #    - avoid_catching_errors
+
+    # Never accidentally use dynamic invocations, as it makes type error very hard to find
+    # Dart SDK: unreleased • (Linter v1.0)
+    #    - avoid_dynamic_calls
+
+    # Since all dart code may be compiled to JS this should be considered.
+    # Disable it manually when you're explicitly not targeting web
+    #
+    #    - avoid_double_and_int_checks
+
+    # Prevents accidental empty else cases. See samples in documentation
+    #
+    #    - avoid_empty_else
+
+    # Use different quotes instead of escaping
+    # Dart SDK: >= 2.8.0-dev.11.0 • (Linter v0.1.111)
+    #    - avoid_escaping_inner_quotes
+
+    # Prevents unnecessary allocation of a field
+    #
+    #    - avoid_field_initializers_in_const_classes
+
+    # Since lint `parameter_assignments` is enabled, the final parameter doesn't add more safety, it would be just verbose
+    # Conflicts with prefer_final_parameters
+    #
+    #    - avoid_final_parameters
+
+    # Prevents allocating a lambda and allows return/break/continue control flow statements inside the loop
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.30)
+    #
+    #    - avoid_function_literals_in_foreach_calls
+
+    # Removes redundant `= null;`
+    #    - avoid_init_to_null
+
+    # Not useful for coding golf, but in every environment where code is maintained by multiple authors.
+    #
+    # Dart SDK: 2.13.0 • (Linter v1.1.0)
+    #
+    #    - avoid_multiple_declarations_per_line
+
+    # Null checks aren't required in ==() operators
+    #
+    #    - avoid_null_checks_in_equality_operators
+
+    # Good APIs don't use ambiguous boolean parameters. Instead use named parameters
+    #    - avoid_positional_boolean_parameters
+
+    # Don't call print in production code
+    #
+    #    - avoid_print
+
+    # Always prefer function references over typedefs.
+    # Jumping twice in code to see the signature of a lambda sucks. This is different from the flutter analysis_options
+    #    - avoid_private_typedef_functions
+
+    # Setters always return void, therefore defining void is redundant
+    #
+    #    - avoid_return_types_on_setters
+
+    # Don't use `Future?`, therefore never return null instead of a Future.
+    # Will become obsolete one Non-Nullable types land
+    #    - avoid_returning_null_for_future
+
+    # Use empty returns, don't show off with you knowledge about dart internals.
+    #    - avoid_returning_null_for_void
+
+    # Prevents logical inconsistencies. It's good practice to define getters for all existing setters.
+    #    - avoid_setters_without_getters
+
+    # Don't reuse a type parameter when one with the same name already exists in the same scope
+    #
+    #    - avoid_shadowing_type_parameters
+
+    # A single cascade operator can be replaced with a normal method call
+    #
+    #    - avoid_single_cascade_in_expression_statements
+
+    # Don't use .toString() in production code which might be minified
+    # Dart SDK: >= 2.10.0-144.0.dev • (Linter v0.1.119)
+    #    - avoid_type_to_string
+
+    # Don't use a parameter names which can be confused with a types (i.e. int, bool, num, ...)
+    #
+    #    - avoid_types_as_parameter_names
+
+    # Containers without parameters have no effect and can be removed
+    #    - avoid_unnecessary_containers
+
+    # Unused parameters should be removed
+    #    - avoid_unused_constructor_parameters
+
+    # For async functions use `Future<void>` as return value, not `void`
+    # This allows usage of the await keyword and prevents operations from running in parallel.
+    #
+    #    - avoid_void_async
+
+    # Flutter mobile only: Web packages aren't available in mobile flutter apps
+    #    - avoid_web_libraries_in_flutter
+
+    # Use the await keyword only for futures. There is nothing to await in synchronous code
+    #
+    #    - await_only_futures
+
+    # Follow the style guide and use UpperCamelCase for extensions
+    #
+    #    - camel_case_extensions
+
+    # Follow the style guide and use UpperCamelCase for class names and typedefs
+    #
+    #    - camel_case_types
+
+    # Prevents leaks and code executing after their lifecycle.
+    # Discussion https://github.com/passsy/dart-lint/issues/4
+    #
+    #
+    #    - cancel_subscriptions
+
+    # Don't cast T? to T. Use ! instead
+    # Dart SDK: >= 2.11.0-182.0.dev • (Linter v0.1.120)
+    #    - cast_nullable_to_non_nullable
+
+    # Checks that files in conditional imports exist
+    #
+    # Linter v1.16.0
+    #    - conditional_uri_does_not_exist
+
+    # Prevents hard to debug code
+    #
+    #    - control_flow_in_finally
+
+    # Single line `if`s are fine, but when a new line splits the bool expression and body curly braces
+    # are recommended. It prevents the danging else problem and easily allows the addition of more lines inside
+    # the if body
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.57)
+    #
+    #    - curly_braces_in_flow_control_structures
+
+    # Requires all referenced dependencies to be declared as direct dependencies in pubspec.yaml. Transitive
+    # dependencies might be removed by a dependency, breaking your code.
+    #
+    # Dart SDK: 2.14.0-172.0.dev • (Linter v1.5.0)
+    #
+    #    - depend_on_referenced_packages
+
+    # When deprecating classes, also deprecate the constructor. When deprecating fields, also deprecate the constructor
+    # parameter. That rule is useful for apps and especially for packages
+    #
+    # Dart SDK: 2.13.0 • (Linter v1.0.0)
+    #
+    #    - deprecated_consistency
+
+    # Follows dart style. Fully supported by IDEs and no manual effort for a consistent style
+    #
+    #    - directives_ordering
+
+    # Add a comment why no further error handling is required
+    #
+    #    - empty_catches
+
+    # Removed empty constructor bodies
+    #
+    #    - empty_constructor_bodies
+
+    # Don't allow empty if bodies. Works together with curly_braces_in_flow_control_structures
+    #
+    #    - empty_statements
+
+    # That's good habit, but not necessary. It might be useful for some parsers that split lines based on the
+    # new line character. Common in simple bash scripts.
+    #
+    # Most IDEs do this automatically, therefore zero effort for devs
+    #
+    # Dart SDK: >=2.14.0-360.0.dev • (Linter v1.8.0)
+    #
+    #    - eol_at_end_of_file
+
+    # Enums aren't powerful enough, now enum like classes get the same linting support
+    #
+    # Dart SDK: >= 2.9.0-12.0.dev • (Linter v0.1.116)
+    #
+    #    - exhaustive_cases
+
+    # Follow dart file naming schema
+    #    - file_names
+
+    # hashCode and equals need to be consistent. One can't live without another.
+    #    - hash_and_equals
+
+    # DON'T import implementation files from another package.
+    # If you need access to some internal code, create an issue
+    #    - implementation_imports
+
+    # Although there are some false positives, this lint generally catches unnecessary checks
+    # - https://github.com/dart-lang/linter/issues/811
+    #
+    #
+    #    - invariant_booleans
+
+    # Type check for `Iterable<T>.contains(other)` where `other is! T`
+    # Without this, `contains` will always report false. Those errors are usually very hard to catch.
+    #
+    #    - iterable_contains_unrelated_type
+
+    # Hint to join return and assignment.
+    #
+    #    - join_return_with_assignment
+
+    # Add leading \n which which makes multiline strings easier to read
+    # Dart SDK: >= 2.8.0-dev.16.0 • (Linter v0.1.113)
+    #    - leading_newlines_in_multiline_strings
+
+    # Makes sure a library name is a valid dart identifier.
+    # This comes in handy for test files combining multiple tests where the file name can be used as identifier
+    #
+    # ```
+    # import src/some_test.dart as some_test;
+    #
+    # main() {
+    #   some_test.main();
+    # }
+    # ```
+    #
+    #    - library_names
+
+    # Follow dart style
+    #
+    #    - library_prefixes
+
+    # Type check for List<T>.remove(item) where item is! T
+    # The list can't contain item. Those errors are not directly obvious especially when refactoring.
+    #    - list_remove_unrelated_type
+
+    # Don't forget the whitespaces at the end
+    #
+    # Dart SDK: >= 2.8.0-dev.10.0 • (Linter v0.1.110)
+    #
+    #    - missing_whitespace_between_adjacent_strings
+
+    # Concat Strings obviously with `+` inside a list.
+    #
+    #    - no_adjacent_strings_in_list
+
+    # Second case is basically dead code which will never be reached.
+    #
+    #    - no_duplicate_case_values
+
+    # private library prefixes don't exist, don't try to introduce concepts that have no effect
+    #
+    # Linter v1.15
+    #    - no_leading_underscores_for_library_prefixes
+
+    # private identifier prefixes don't exist, don't try to introduce concepts that have no effect
+    #
+    # Linter v1.15
+    #    - no_leading_underscores_for_local_identifiers
+
+    # Flutter only: `createState` shouldn't pass information into the state
+    #
+    #    - no_logic_in_create_state
+
+    # calling `runtimeType` may be a performance problem
+    # Dart SDK: >= 2.8.0-dev.10.0 • (Linter v0.1.110)
+    #    - no_runtimeType_toString
+
+    # Follow dart style naming conventions
+    #
+    #    - non_constant_identifier_names
+
+    # Don't call unnecessary conversion methods on primitives
+    #
+    # Dart SDK: 2.14.0-172.0.dev • (Linter v1.5.0)
+    #
+    #    - noop_primitive_operations
+
+    # Generic T might have a value of String or String?. Both are valid.
+    # This lint triggers when ! is used on T? casting (String?)? to String and not (String?)? to String?
+    # Dart SDK: >= 2.11.0-182.0.dev • (Linter v0.1.120)
+    #    - null_check_on_nullable_type_parameter
+
+    # Might become irrelevant when non-nullable types land in dart. Until then use this lint check which checks for
+    # non null arguments for specific dart sdk methods.
+    #
+    #    - null_closures
+
+
+    # Highlights unintentionally overridden fields.
+    # overridden_fields
+
+    # Follow dart style package naming convention
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.31)
+    #
+    #    - package_names
+
+    # Seems very rare, especially for applications.
+    #    - package_prefixed_library_names
+
+    # Most likely a mistake, if not: bad practice
+    #
+    #    - parameter_assignments
+
+    # Makes it easier to migrate to const constructors and to have final fields
+    #
+    #    - prefer_asserts_in_initializer_lists
+
+    # Collection literals are shorter. They exists, use them.
+    #
+    #    - prefer_collection_literals
+
+    # Use the ??= operator when possible
+    #
+    #    - prefer_conditional_assignment
+
+    # Always use const when possible, make runtime faster
+    #
+    # prefer_const_constructors
+
+    # Add a const constructor when possible
+    #
+    # prefer_const_constructors_in_immutables
+
+    # final is good, const is better
+    # prefer_const_declarations
+
+    # Always use const when possible, make runtime faster
+    #
+    # prefer_const_literals_to_create_immutables
+
+    # Dart has named constructors. Static methods in other languages (java) are a workaround which don't have
+    # named constructors.
+    #
+    # prefer_constructors_over_static_methods
+
+    # Contains may be faster and is easier to read
+    #
+    #    - prefer_contains
+
+    # Prevent confusion with call-side when using named parameters
+    #
+    #    - prefer_equal_for_default_values
+
+    # Avoid accidental reassignments and allows the compiler to do optimizations.
+    #
+    #    - prefer_final_fields
+
+    # Helps avoid accidental reassignments and allows the compiler to do optimizations.
+    #
+    #    - prefer_final_in_for_each
+
+    # Helps avoid accidental reassignments and allows the compiler to do optimizations.
+    #
+    #    - prefer_final_locals
+
+    # Saves lot of code
+    #
+    #    - prefer_for_elements_to_map_fromIterable
+
+    # As Dart allows local function declarations, it is a good practice to use them in the place of function literals.
+    #    - prefer_function_declarations_over_variables
+
+    # For consistency
+    #
+    #    - prefer_generic_function_type_aliases
+
+    # Allows potential usage of const
+    #    - prefer_if_elements_to_conditional_expressions
+
+    # Dart has a special operator for this, use it
+    #
+    #    - prefer_if_null_operators
+
+    # Terser code
+    #    - prefer_initializing_formals
+
+    # Easier move towards const, and way easier to read
+    #
+    #    - prefer_inlined_adds
+
+    # Interpolate, use less "", '' and +
+    #    - prefer_interpolation_to_compose_strings
+
+    # Iterables do not necessary know their length
+    #
+    #    - prefer_is_empty
+
+    # Easier to read
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.5)
+    #
+    #    - prefer_is_not_empty
+
+    # Use the `foo is! Foo` instead of `!(foo is Foo)`
+    #    - prefer_is_not_operator
+
+    # Easier to read
+    #
+    #    - prefer_iterable_whereType
+
+    # It's shorter and should be preferred. Especially helpful for devs new to dart.
+    #
+    # Dart SDK: 2.14.0-2.0.dev • (Linter v1.3.0)
+    #
+    #    - prefer_null_aware_method_calls
+
+    # Makes expressions with null checks easier to read.
+    #    - prefer_null_aware_operators
+
+    # Allows potential usage of const
+    #
+    #    - prefer_spread_collections
+
+    # Define types
+    #
+    #    - prefer_typing_uninitialized_variables
+
+    # Null is not a type, use void
+    #    - prefer_void_to_null
+
+    # Document the replacement API
+    #    - provide_deprecation_message
+
+    # Hints accidental recursions
+    #
+    #    - recursive_getters
+
+    # Dartfmt formats differently when adding trailing commas. This lint makes sure there is zero doubt in how code
+    # should be formatted.
+    #
+    # This rule is debatable, though.
+    # A non-representative [vote](https://twitter.com/passsy/status/1427220769050972162) shows a strong tendency towards
+    # enabling this rule. Especially because the code example does only include the debatable formatting changes. There
+    # are more, especially in Flutter build methods which make the code clearly better.
+    #
+    # Dart SDK: 2.14.0-2.0.dev • (Linter v1.3.0)
+    #
+    #    - require_trailing_commas
+
+    # Use https in pubspec.yaml
+    #
+    # Linter v1.15
+    #    - secure_pubspec_urls
+
+    # Flutter only, prefer SizedBox over Container which offers a const constructors
+    # Dart SDK: >= 2.9.0-4.0.dev • (Linter v0.1.115)
+    # - sized_box_for_whitespace
+
+    # Use the SizeBox.expand or SizeBox.shrink constructor instead of setting both width and height
+    # to `0` or `double.infinity`
+    #
+    # Linter v1.15
+    #    - sized_box_shrink_expand
+
+    # Follow dart style use triple slashes
+    #
+    #    - slash_for_doc_comments
+
+    # Flutter only, always put child last
+    #
+    #    - sort_child_properties_last
+
+    # Default constructor comes first.
+    #
+    #    - sort_unnamed_constructors_first
+
+    # First test, then cast
+    #
+    #    - test_types_in_equals
+
+    # Hard to debug and bad style
+    #
+    #    - throw_in_finally
+
+    # Help the compiler at compile time with non-null asserts rather than crashing at runtime
+    # Dart SDK: >= 2.11.0-182.0.dev • (Linter v0.1.120)
+    #    - tighten_type_of_initializing_formals
+
+    # Type annotations make the compiler intelligent, use them
+    #    - type_annotate_public_apis
+
+    # Don't add types for already typed constructor parameters.
+    #
+    #    - type_init_formals
+
+    # Remove async/await clutter when not required
+    #    - unnecessary_await_in_return
+
+    # Remove unnecessary braces
+    #
+    #    - unnecessary_brace_in_string_interps
+
+    # Yes, const everywhere. But not in an already const scope
+    #
+    # unnecessary_const
+
+    # unnecessary_constructor_name
+
+    # Getter/setters can be added later on in a non API breaking manner
+    #
+    #    - unnecessary_getters_setters
+
+    # Remove the optional `new` keyword
+    #
+    #    - unnecessary_new
+
+    # Don't assign `null` when value is already `null`.
+    #
+    #    - unnecessary_null_aware_assignments
+
+    # Remove ! when already non-nullable
+    # Dart SDK: >= 2.10.0-144.0.dev • (Linter v0.1.119)
+    #    - unnecessary_null_checks
+
+    # Don't assign `null` when value is already `null`.
+    #
+    #    - unnecessary_null_in_if_null_operators
+
+    # If a variable doesn't change and is initialized, no need to define it as nullable (NNDB)
+    # Dart SDK: >= 2.10.0-10.0.dev • (Linter v0.1.118)
+    #    - unnecessary_nullable_for_final_variable_declarations
+
+    # Remove overrides which simply call super
+    #    - unnecessary_overrides
+
+    # Remove clutter where possible
+    #    - unnecessary_parenthesis
+
+    # Use raw string only when needed
+    # Dart SDK: >= 2.8.0-dev.11.0 • (Linter v0.1.111)
+    #    - unnecessary_raw_strings
+
+    # Avoid magic overloads of + operators
+    #    - unnecessary_statements
+
+    # Remove unnecessary escape characters
+    # Dart SDK: >= 2.8.0-dev.11.0 • (Linter v0.1.111)
+    #    - unnecessary_string_escapes
+
+    #    - unnecessary_late
+
+    # Completely unnecessary code, simplify to save a few CPU cycles
+    #
+    # Dart SDK: >= 2.8.0-dev.10.0 • (Linter v0.1.110)
+    #
+    #    - unnecessary_string_interpolations
+
+    # The variable is clear, remove clutter
+    #
+    #    - unnecessary_this
+
+    # Highlights potential bugs where unrelated types are compared with another. (always *not* equal).
+    #
+    #    - unrelated_type_equality_checks
+
+    # Web only
+    #
+    #    - unsafe_html
+
+    # Very useful in preventing Flutter BuildContext bugs in async callbacks
+    #
+    # Dart SDK: 2.13.0 • (Linter v1.1.0)
+    #
+    #    - use_build_context_synchronously
+
+    # Yet another "Container might be overkill" lint
+    #
+    # Linter v1.15
+    #    - use_decorated_box
+
+    # Always use hex syntax Color(0x00000001), never Color(1)
+    #
+    #    - use_full_hex_values_for_flutter_colors
+
+    # Always use generic function type syntax, don't mix styles
+    #
+    #    - use_function_type_syntax_for_parameters
+
+    # Don't use the modulo operator for isEven/isOdd checks
+    #
+    # Linter v0.1.116
+    #    - use_is_even_rather_than_modulo
+
+    # Replace const values with predefined constants
+    # `const Duration(seconds: 0)` -> `Duration.zero`
+    #
+    # Dart SDK: 2.13.0 • (Linter v1.0.0)
+    #
+    # use_named_constants
+
+    # Some might argue `late` is a code smell, this lint is very opinionated. It triggers only for private fields and
+    # therefore might actually cleanup some code.
+    # There is no performance impact either way https://github.com/dart-lang/linter/pull/2189#discussion_r457945301
+    #
+    # Dart SDK: >= 2.10.0-10.0.dev • (Linter v0.1.118)
+    #
+    #    - use_late_for_private_fields_and_variables
+
+    # Use rethrow to preserve the original stacktrace.
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.31)
+    #
+    #    - use_rethrow_when_possible
+
+    # Use the setter syntax
+    #
+    #    - use_setters_to_change_properties
+
+    # In most cases, using a string buffer is preferred for composing strings due to its improved performance.
+    #    - use_string_buffers
+
+    # Don't use try-catch with fail(), instead catch the error with the `throwsA` matcher. The big advantage:
+    # When another error is thrown, the assertion fails whereas catching a specific error would miss the catch block
+    #
+    # Dart SDK: 2.14.0-172.0.dev • (Linter v1.5.0)
+    #
+    #    - use_test_throws_matchers
+
+    # Catches invalid regular expressions.
+    #
+    #    - valid_regexps
+
+    # Don't assign anything to void
+    #    - void_checks
+
+    # Carries more meaning than a generic Container
+    # - use_colored_box
+
+    # - always_use_package_imports # project rule to differentiate external package imports from our code
+    # - avoid_relative_lib_imports # obviously if above is true this one is true too
+
+    # It is expected that mutable objects which override hash & equals shouldn't be used as keys for hashmaps.
+    # avoid_equals_and_hash_code_on_mutable_classes
+
+    # Only useful when targeting JS
+    # Warns about too large integers when compiling to JS
+    #
+    # - avoid_js_rounded_ints
+
+    # - avoid_redundant_argument_values
+
+    # - avoid_renaming_method_parameters
+
+    # - avoid_returning_this
+
+    # - constant_identifier_names
+
+    # - flutter_style_todos
+
+    # - no_default_cases
+
+    # Since Errors aren't intended to be caught (see avoid_catching_errors), throwing anything
+    # doesn't cause trouble.
+    # - only_throw_errors
+
+    # - prefer_adjacent_string_concatenation
+
+    # - prefer_asserts_with_message
+
+    # - unnecessary_to_list_in_spreads
+
+    # - use_enums
+
+    # Useful for testing and debug purposes
+    # - use_key_in_widget_constructors
+
+    # - use_raw_strings
+
+    # - use_super_parameters
+
+    # - use_to_and_as_if_applicable
+
+    ########################################################################
+    ##          INHERITED ENABLED RULES: NEED MONITORING !                ##
+    ##          ------------------------------------------                ##
+    ##                                                                    ##
+    ##    Those rules need monitoring because we are not sure yet         ##
+    ##    if they are pertinent or will just create clutter.              ##
+    ##                                                                    ##
+    ##    Rules below come from package                                   ##
+    ##          https://pub.dev/packages/very_good_analysis               ##
+    ########################################################################
+
+    # !MONITOR!
+    # Too many false positives.
+    # Using the pedantic package for the unawaited function doesn't make code better readable
+    # unawaited_futures # @orevial not sure about this one, I would usually enable it but we might want unawaited futures, let's check at how many cases are send and if they are legit : probably deactive after analyze
+
+    # !MONITOR!
+    # Flutter setState is a good example where a lambda should always be used.
+    #
+    # Some generic code sometimes requires lambdas, otherwise the generic type isn't forwarded correctly.
+    #
+    # - unnecessary_lambdas
+
+    # !MONITOR!
+    # Write `if (nullableBool ?? false)` instead of `if (nullableBool == true)`
+    # Not enabled, because `nullableBool == true` is very explicit, whereas `nullableBool ?? false` requires
+    # cognitive effort to process
+    #
+    # Dart SDK: 2.13.0 • (Linter v1.0.0)
+    #
+    # - use_if_null_to_convert_nulls_to_bools
+
+    # !MONITOR!
+    # Good for libraries to prevent unnecessary code paths.
+    # False positives may occur for applications when boolean properties are generated by external programs
+    # producing auto-generated source code
+    #
+    # Known issue: while(true) loops https://github.com/dart-lang/linter/issues/453
+    #
+    #
+    # - literal_only_boolean_expressions
+
+    # !MONITOR!
+    # Might cause frame drops because of synchronous file access on mobile, especially on older phones with slow storage.
+    # There are no known measurements sync access does *not* drop frames.
+    #
+    # - avoid_slow_async_io
+
+    # !MONITOR!
+    # The cascade syntax is weird and you shouldn't be forced to use it.
+    # Potential false positives:
+    #   https://github.com/dart-lang/linter/issues/1589
+    #
+    # - cascade_invocations
+
+    # !MONITOR!
+    # Potential false positives:
+    # - https://github.com/dart-lang/linter/issues/1142
+    #
+    # - comment_references
+
+
+    ########################################################################
+    ##                       INHERITED DISABLED RULES                     ##
+    ##                       ------------------------                      ##
+    ##                                                                    ##
+    ##   Rules below come from package                                    ##
+    ##      https://pub.dev/packages/very_good_analysis                   ##
+    ########################################################################
+
+    # All methods should define a return type. dynamic is no exception.
+    # Violates Effective Dart "PREFER annotating with dynamic instead of letting inference fail"
+    #
+    # - avoid_annotating_with_dynamic
+
+    # A leftover from dart1, should be deprecated
+    #
+    # - https://github.com/dart-lang/linter/issues/1401
+    # - avoid_as
+
+    # There are no strong arguments to enable this rule because it is very strict. Catching anything is useful
+    # and common even if not always the most correct thing to do.
+    #
+    # - avoid_catches_without_on_clauses
+
+    # Adding the type is not required, but sometimes improves readability. Therefore removing it doesn't always help
+    # - avoid_types_on_closure_parameters
+
+    # False positives, not reliable enough
+    # - https://github.com/dart-lang/linter/issues/1381
+    #
+    #
+    # - close_sinks
+
+    # Still experimental and pretty much work when enforced
+    # - diagnostic_describe_all_properties
+
+    # String.fromEnvironment looks up env variables at compile time. The variable is baked in by the compiler
+    # and can't be changed by environment variables.
+    #
+    # For dart apps:
+    # Better look up an environment variable at runtime with Platform.environment
+    # or use code generation to define variables at compile time.
+    #
+    # For Flutter apps:
+    # String.fromEnvironment is the recommended way to include variables defined with `flutter build --dart-define`
+    #
+    #
+    # Dart SDK: >= 2.10.0-0.0.dev • (Linter v0.1.117)
+    # - do_not_use_environment
+
+    # Single line methods + implementation makes it hard to write comments for that line.
+    # Dense code isn't necessarily better code.
+    #
+    # - prefer_expression_function_bodies
+
+    # While prefer_final_fields and prefer_final_locals is enabled, this lint would add a lot of clutter to methods,
+    # especially lambdas.
+    # parameter_assignments is already enabled, catching this error
+    # Conflicts with avoid_final_parameters
+    #
+    # Dart SDK: 2.14.0-172.0.dev • (Linter v1.5.0)
+    #
+    # - prefer_final_parameters
+
+    # Dense code isn't necessarily better code
+    #
+    # - prefer_foreach
+
+    # Users of a 3rd party mixins can't change 3rd party code to use the mixin syntax.
+    # This makes the rule useless
+    # - prefer_mixin
+
+    # Use whatever makes you happy. lint doesn't define a style
+    # Conflicts with prefer_single_quotes
+    #
+    # - prefer_double_quotes
+
+    # Disabled because `final` prevents accidental reassignment
+    # - unnecessary_final
+
+    # - prefer_relative_imports
+
+    # - always_put_control_body_on_new_line
+
+    # - always_specify_types
+
+    # Can usually be replaced with an extension
+    # => Yes, but sometimes static classes are okay...
+    #
+    # Dart SDK: >= 2.0.0 • (Linter v0.1.31)
+    #
+    #    - avoid_classes_with_only_static_members
+
+    # Don't break value types by implementing them
+    #    - avoid_implementing_value_types
+
+    # unnecessary_null_aware_operator_on_extension_on_nullable
+
+    # use_string_in_part_of_directives
