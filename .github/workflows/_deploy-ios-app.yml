@@ -1,0 +1,134 @@
+name: 📦🚀 Build & deploy iOS app for an environment
+
+on:
+  workflow_call:
+    inputs:
+      environment-name:
+        required: true
+        type: string
+      environment-url:
+        required: true
+        type: string
+      short-environment-name:
+        required: true
+        type: string
+      flavor:
+        required: true
+        type: string
+      new-pubspec-version:
+        required: true
+        type: string
+
+jobs:
+  deployIos:
+    name: 🍏📦🚀 Build & deploy iOS ${{ inputs.short-environment-name }} release
+    runs-on: macos-latest
+    environment:
+      name: ${{ inputs.environment-name }}
+      url: ${{ inputs.environment-url }}
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+      - name: 🔐 Install Apple certificate and provisioning profile
+        env:
+          P12_DISTRIBUTION_CERTIFICATE_BASE64: "${{ secrets.IOS_P12_DISTRIBUTION_CERTIFICATE_BASE64 }}"
+          P12_DISTRIBUTION_CERTIFICATE_PASSWORD: "${{ secrets.IOS_P12_DISTRIBUTION_CERTIFICATE_PASSWORD }}"
+          DISTRIBUTION_PROVISIONING_PROFILE_BASE64: "${{ secrets.IOS_DISTRIBUTION_PROVISIONING_PROFILE_BASE64 }}"
+          KEYCHAIN_PASSWORD: "${{ secrets.IOS_RUNNER_LOCAL_KEYCHAIN_PASSWORD }}"
+          EXPORT_OPTIONS_BASE64: "${{ secrets.IOS_EXPORT_OPTIONS_BASE64 }}"
+        run: |
+          # create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PROVISIONING_PROFILE_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          EXPORT_OPTIONS_PATH="${{ github.workspace }}/app/ios/Runner/ExportOptions.plist"
+
+          # import certificate, provisioning profile and export options from secrets
+          echo -n "$P12_DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$DISTRIBUTION_PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PROVISIONING_PROFILE_PATH
+          echo -n "$EXPORT_OPTIONS_BASE64" | base64 --decode -o $EXPORT_OPTIONS_PATH
+
+          # create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$P12_DISTRIBUTION_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # apply provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PROVISIONING_PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+      - name: 📝 Edit pubspec version
+        run: |
+          sed -Ei "" "s/^version: (.*)/version: ${{ inputs.new-pubspec-version }}/" app/pubspec.yaml
+      - name: ⚙️ Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.7.0"
+          channel: 'stable'
+          cache: true
+        id: flutter
+      - name: ⚙️ Setup Melos
+        uses: bluefireteam/melos-action@v2
+      - name: ⚙️ Install dependencies for all packages
+        run: melos build:pub_get:all
+      - name: 🍏📦 Create iOS ${{ inputs.short-environment-name }} appbundle release
+        run: |
+          pushd app/
+          flutter build ipa \
+            --release \
+            --flavor ${{ inputs.flavor }} \
+            --target lib/main_${{ inputs.flavor }}.dart \
+            --export-options-plist=ios/Runner/ExportOptions.plist
+          popd
+      - name: 🍏🚀 Deploy to App Store (Testflight)
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: ${{ github.workspace }}/app/build/ios/ipa/flutter_ci_cd_demo.ipa
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+      - name: 💬 Pick a random success catchphrase
+        if: success()
+        id: success_catchphrase
+        run: |
+          sentences=('🤩 AMAZING !' 'Woop woop 🎉' 'Oh wow 😮' '😎 Yeahhhh !' '📣 Amazing announcement !' '📢 Your attention please...' '👏 Great work !' '🍾 Champagne !' '🙌 High five !' '🥳 Time to celebrate !')
+          arrayLength=${#sentences[@]}
+          randomNumber=$(($RANDOM%$arrayLength))
+          pickedSentence=${sentences[$randomNumber]}
+          echo "picked_sentence=$pickedSentence" >> $GITHUB_OUTPUT
+      - name: 🔔✅ Send success notif to Discord
+        if: success()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_DEPLOYMENT_WEBHOOK_URL }}
+          avatar_url: ${{ secrets.DISCORD_DEPLOYMENT_WEBHOOK_AVATAR }}
+          username: "${{ inputs.short-environment-name }} notifier"
+          content: "${{ steps.success_catchphrase.outputs.picked_sentence }}"
+          title: "🍏 New version of ${{ inputs.environment-name }} app available !"
+          description: |
+            Version `${{ inputs.new-pubspec-version }}`
+            Click [here](${{ inputs.environment-url }}) to download
+          url: ${{ inputs.environment-url }}
+          nofail: true
+          nodetail: true
+      - name: 🔔❌ Send failure notif to Discord
+        if: failure()
+        uses: sarisia/actions-status-discord@v1
+        env:
+          RUN_URL: "https://github.com/orevial/flutter-ci-cd-demo/actions/runs/${{ github.run_id }}"
+        with:
+          webhook: ${{ secrets.DISCORD_BUILD_WEBHOOK_URL }}
+          avatar_url: ${{ secrets.DISCORD_DEPLOYMENT_WEBHOOK_AVATAR }}
+          username: "${{ inputs.short-environment-name }} notifier"
+          content: "Oh no 😢"
+          title: "🍏 Release of ${{ inputs.environment-name }} app has failed..."
+          description: |
+            Failed job: 🍏📦🚀 Build & deploy iOS ${{ inputs.short-environment-name }} release
+            Failed to release version `${{ inputs.new-pubspec-version }}` of ${{ inputs.environment-name }} app
+            Click [here](${{ env.RUN_URL }}) to go to failed run output
+          url: ${{ env.RUN_URL }}
+          nofail: true
+          nodetail: true

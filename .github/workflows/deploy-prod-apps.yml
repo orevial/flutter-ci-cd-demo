@@ -1,0 +1,71 @@
+name: 📦🚀 Build & deploy Prod release
+
+permissions: write-all
+
+on: workflow_dispatch
+
+jobs:
+  gitRelease:
+    name: Create git release for Prod app
+    runs-on: ubuntu-latest
+    outputs:
+      new_pubspec_version: "${{ steps.get_new_pubspec_version.outputs.next_pubspec_version }}"
+    steps:
+      - name: 👁️ Check branch validity
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "⚠️ Error: you tried to create a release from '${{ github.ref }}' branch but production releases can only be created from 'main' branch"
+      - name: ⬇️ Checkout repository with tags
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_AUTOMATOR_PAT }}
+      - name: 🏷️🧪 Get latest Prod release
+        id: get_latest_prod_release
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          prefix: "release/prod/"
+          fallback: 0.0.1
+      - name: ⚙️ Prepare semantic release configuration
+        run: |
+          mv .releaserc.prod.json .releaserc.json
+      - name: 🏷️✍️ Create new Prod release tag
+        id: semantic_release_info
+        uses: cycjimmy/semantic-release-action@v3.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_AUTOMATOR_PAT }}
+        with:
+          semantic_version: 19
+      - name: 📝 Edit pubspec version
+        id: get_new_pubspec_version
+        run: |
+          last_prod_release=$(echo "${{ steps.get_latest_prod_release.outputs.tag }}" | sed -E "s/release\/prod\/(.*)/\1/")
+          next_pubspec_version=$(./scripts/semver.sh "$last_prod_release" "${{ steps.semantic_release_info.outputs.new_release_version }}")
+          sed -Ei "s/^version: (.*)/version: $next_pubspec_version/" app/pubspec.yaml
+          echo "next_pubspec_version=$next_pubspec_version" >> $GITHUB_OUTPUT
+      - name: 🔀 Push bump commit with changelog to repository
+        uses: stefanzweifel/git-auto-commit-action@v4.16.0
+        with:
+          commit_message: "chore(*): bump to version ${{ steps.get_new_pubspec_version.outputs.next_pubspec_version }} [skip ci]"
+      - name: 🏷️✍️ Create new Prod release tag
+        uses: rickstaa/action-create-tag@v1
+        with:
+          tag: "release/prod/${{ steps.get_new_pubspec_version.outputs.next_pubspec_version }}"
+          message: "UAT release ${{ steps.get_new_pubspec_version.outputs.next_pubspec_version }}"
+          github_token: ${{ secrets.RELEASE_AUTOMATOR_PAT }}
+
+  deployProd:
+    name: Deploy Prod
+    uses: ./.github/workflows/_deploy-env-apps.yml
+    needs: gitRelease
+    secrets: inherit
+    with:
+      android-environment-name: 'Android Prod'
+      android-environment-url: 'https://play.google.com/console/u/0/developers/7200533445067191438/app/4976229890619914417/tracks/internal-testing'
+      android-package-name: 'com.orevial'
+      android-release-status: 'completed'
+      ios-environment-name: 'iOS Prod'
+      ios-environment-url: 'https://appstoreconnect.apple.com/apps/1292528725/testflight/ios'
+      short-environment-name: 'Prod'
+      flavor: 'prod'
+      new-pubspec-version: ${{ needs.gitRelease.outputs.new_pubspec_version }}

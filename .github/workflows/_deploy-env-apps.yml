@@ -1,0 +1,59 @@
+name: 📦🚀 Build & deploy iOS & Android app
+
+on:
+  workflow_call:
+    inputs:
+      # Common inputs
+      short-environment-name:
+        required: true
+        type: string
+      flavor:
+        required: true
+        type: string
+      new-pubspec-version:
+        required: true
+        type: string
+      # Android specific inputs
+      android-environment-name:
+        required: true
+        type: string
+      android-environment-url:
+        required: true
+        type: string
+      android-package-name:
+        required: true
+        type: string
+      android-release-status:
+        required: true
+        type: string
+      # iOS specific inputs
+      ios-environment-name:
+        required: true
+        type: string
+      ios-environment-url:
+        required: true
+        type: string
+
+jobs:
+  deployAndroid:
+    name: 🤖📦🚀 Build & deploy Android ${{ inputs.short-environment-name }} release
+    uses: ./.github/workflows/_deploy-android-app.yml
+    secrets: inherit
+    with:
+      environment-name: ${{ inputs.android-environment-name }}
+      environment-url: ${{ inputs.android-environment-url }}
+      package-name: ${{ inputs.android-package-name }}
+      release-status: ${{ inputs.android-release-status }}
+      short-environment-name: ${{ inputs.short-environment-name }}
+      flavor: ${{ inputs.flavor }}
+      new-pubspec-version: ${{ inputs.new-pubspec-version }}
+  deployIos:
+    name: 🍏📦🚀 Build & deploy iOS ${{ inputs.short-environment-name }} release
+    uses: ./.github/workflows/_deploy-ios-app.yml
+    secrets: inherit
+    with:
+      environment-name: ${{ inputs.ios-environment-name }}
+      environment-url: ${{ inputs.ios-environment-url }}
+      short-environment-name: ${{ inputs.short-environment-name }}
+      flavor: ${{ inputs.flavor }}
+      new-pubspec-version: ${{ inputs.new-pubspec-version }}

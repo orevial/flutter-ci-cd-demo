@@ -1,0 +1,6 @@
+name: flutter_ci_cd_demo
+description: Dart Code Metrics helper for aggregated report generation
+
+environment:
+  sdk: '>=2.19.0 <3.0.0'
+  flutter: ">=3.7.0 <4.0.0"

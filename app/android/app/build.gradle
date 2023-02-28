@@ -1,0 +1,117 @@
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterRoot = localProperties.getProperty('flutter.sdk')
+if (flutterRoot == null) {
+    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+
+// Note: we need to put dummy keystore so that compiler does not complain
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists() && !keystorePropertiesFile.isDirectory()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+} else {
+    keystoreProperties['uatStoreFile'] = 'dummy.keystore';
+    keystoreProperties['prodStoreFile'] = 'dummy.keystore';
+}
+
+if (keystoreProperties['uatStoreFile'] == null) {
+    keystoreProperties['uatStoreFile'] = 'dummy.keystore'
+}
+
+if (keystoreProperties['prodStoreFile'] == null) {
+    keystoreProperties['prodStoreFile'] = 'dummy.keystore'
+}
+
+android {
+    compileSdkVersion flutter.compileSdkVersion
+    ndkVersion flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        applicationId "com.orevial.flutter_ci_cd_demo"
+        minSdkVersion Math.max(flutter.minSdkVersion, 21)
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
+
+    flavorDimensions "flavor-type"
+
+    signingConfigs {
+        uatRelease {
+            storeFile file(keystoreProperties['uatStoreFile'])
+            storePassword keystoreProperties['uatStorePassword']
+            keyAlias keystoreProperties['uatKeyAlias']
+            keyPassword keystoreProperties['uatKeyPassword']
+        }
+
+        prodRelease {
+            storeFile file(keystoreProperties['prodStoreFile'])
+            storePassword keystoreProperties['prodStorePassword']
+            keyAlias keystoreProperties['prodKeyAlias']
+            keyPassword keystoreProperties['prodKeyPassword']
+        }
+    }
+
+    productFlavors {
+        dev {
+            dimension "flavor-type"
+            resValue "string", "app_name", "CI/CD Demo - Dev"
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+        }
+        uat {
+            dimension "flavor-type"
+            resValue "string", "app_name", "CI/CD Demo - UAT"
+            applicationIdSuffix ".uat"
+            versionNameSuffix "-uat"
+            signingConfig signingConfigs.uatRelease
+        }
+        prod {
+            dimension "flavor-type"
+            resValue "string", "app_name", "CI/CD Demo"
+            signingConfig signingConfigs.prodRelease
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}

@@ -1,0 +1,78 @@
+name: 🧪 Test with coverage 📊
+
+on:
+  workflow_call:
+
+jobs:
+  coverage:
+    name: 🧪 Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+      - name: ⚙️ Install lcov
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install lcov
+      - name: ⚙️ Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - name: ⚙️ Setup Melos
+        uses: bluefireteam/melos-action@v2
+      - name: ⚙️ Install dependencies for all packages
+        run: melos build:pub_get:all
+      - name: 🧪 Run tests with coverage
+        run: melos test:with-lcov-coverage:all
+      - name: 🧪✅❌ Publish test results
+        id: compute_test_results
+        uses: dorny/test-reporter@v1.6.0
+        with:
+          name: '🧪📊 Unit tests report'
+          path: test_reports/*_test_report.json
+          reporter: 'flutter-json'
+          max-annotations: '50'
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: 🪪 Create passing test results badge
+        if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+        uses: schneegans/dynamic-badges-action@v1.6.0
+        with:
+          auth: ${{ secrets.BADGE_GIST_TOKEN }}
+          gistID: "2e904f1d8a9ef0e1e1458de1e7fcfba6"
+          filename: "passing-tests-badge.json"
+          label: 'Tests'
+          message: '${{ steps.compute_test_results.outputs.passed }} passed, ${{ steps.compute_test_results.outputs.failed }} failed'
+          namedLogo: "TestCafe"
+          labelColor: 'lightgrey'
+          color: ${{ steps.compute_test_results.outputs.failed == 0 && 'brightgreen' ||  'red' }}
+      - name: 🧪📊 Publish coverage report
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: coverage_report/cleaned_combined_lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          title: 'Coverage Report'
+      - name: 🥤 Extract test coverage percentage
+        if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+        run: |
+          melos run test:generate-html-coverage
+          grep -o '.*headerCovTableEntryLo.*' coverage_report/index.html | sed -E  's/.*>(.*) %<.*/\1/' > coverage_percentage.txt
+          percentage=$(cat coverage_percentage.txt)
+          echo "Coverage percentage: $percentage"
+          echo "coverage_percentage=$percentage" >> $GITHUB_ENV
+      - name: 🪪 Create test coverage badge
+        if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+        uses: schneegans/dynamic-badges-action@v1.6.0
+        with:
+          auth: ${{ secrets.BADGE_GIST_TOKEN }}
+          gistID: "2e904f1d8a9ef0e1e1458de1e7fcfba6"
+          filename: "test-coverage-badge.json"
+          label: 'Test coverage'
+          message: '${{ env.coverage_percentage }} %'
+          namedLogo: "Codecov"
+          labelColor: 'lightgrey'
+          valColorRange: ${{ env.coverage_percentage }}
+          minColorRange: 50
+          maxColorRange: 80

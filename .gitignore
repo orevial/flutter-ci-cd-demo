@@ -8,7 +8,6 @@
 .buildlog/
 .history
 .svn/
-migrate_working_dir/
 
 # IntelliJ related
 *.iml
@@ -23,22 +22,32 @@ migrate_working_dir/
 
 # Flutter/Dart/Pub related
 **/doc/api/
-**/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
-/build/
+build/
+coverage/*
+coverage_report/*
+junit_test_reports/*
+test_reports/*
+test_results.xml
+**/failures/
 
-# Symbolication related
-app.*.symbols
+# Web related
+lib/generated_plugin_registrant.dart
 
-# Obfuscation related
-app.*.map.json
+# Exceptions to above rules.
+!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+.metadata
+!coverage/.gitkeep
+!coverage_report/.gitkeep
+!junit_test_reports/.gitkeep
+!test_reports/.gitkeep
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+.fvm/flutter_sdk
+**/.bundle
+**/fastlane/report.xml
+
